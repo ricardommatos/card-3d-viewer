@@ -1,6 +1,6 @@
 # Card 3D Viewer
 
-Interactive 3D layered card viewer — IBM × Stagwell.
+Interactive 3D layered card viewer.
 
 A single-file web app that stacks 4 SVG layers along the Z axis and lets you rotate the card in 3D space, tweak spacing / scale / FOV in real time, and export high-resolution snapshots.
 
@@ -18,5 +18,5 @@ A single-file web app that stacks 4 SVG layers along the Z axis and lets you rot
 ## Stack
 
 - `three@0.162` via ES Modules CDN
-- IBM Plex Mono for UI typography
+- JetBrains Mono for UI typography
 - Zero build step — open `index.html` directly or via any static server

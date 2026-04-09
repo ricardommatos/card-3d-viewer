@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-  <title>Card / 3D — IBM × Stagwell</title>
+  <title>Card / 3D</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
       --fg: #000;
@@ -26,7 +26,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-weight: 400;
       color: var(--fg);
       -webkit-font-smoothing: antialiased;
@@ -225,7 +225,6 @@
   <div id="ui">
     <div class="title">
       <span>Card · 3D</span>
-      <span class="muted">IBM × SW</span>
     </div>
 
     <div class="group">
@@ -429,10 +428,10 @@
     // Only visible when the card is rotated past 90° (i.e. you're looking
     // at the back of the card).
     async function buildBackText() {
-      // Wait for IBM Plex Mono to load before drawing to canvas, otherwise
+      // Wait for JetBrains Mono to load before drawing to canvas, otherwise
       // the browser falls back to a system monospace.
       try {
-        await document.fonts.load('400 26px "IBM Plex Mono"');
+        await document.fonts.load('400 26px "JetBrains Mono"');
       } catch (_) { /* best effort */ }
 
       const size = 2048;
@@ -445,7 +444,7 @@
       // Font size chosen to visually match the 10–11px UI text when the card
       // fills most of the viewport. (1 world unit ≈ 204.8 texture px,
       // card is ~88% of view height → 1 screen px ≈ 2.3 texture px.)
-      ctx.font = '400 26px "IBM Plex Mono", ui-monospace, monospace';
+      ctx.font = '400 26px "JetBrains Mono", ui-monospace, monospace';
       if ('letterSpacing' in ctx) ctx.letterSpacing = '2.08px'; // ~0.08em
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
