@@ -1,0 +1,7 @@
+.DS_Store
+*.log
+
+# Reference material (not part of the app)
+example.jpg
+example 2.jpg
+videoframe_*.png

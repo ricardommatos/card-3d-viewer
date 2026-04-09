@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <title>Card / 3D — IBM × Stagwell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --fg: #000;
+      --muted: rgba(0, 0, 0, 0.4);
+      --border: #000;
+      --panel-bg: rgba(255, 255, 255, 0.92);
+      --accent: #1100ff;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 400;
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body.bg-light  { background: #e5e5e5; }
+    body.bg-dark   { background: #111111; }
+    body.bg-transparent {
+      background-color: #e5e5e5;
+      background-image:
+        linear-gradient(45deg, #c8c8c8 25%, transparent 25%),
+        linear-gradient(-45deg, #c8c8c8 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #c8c8c8 75%),
+        linear-gradient(-45deg, transparent 75%, #c8c8c8 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+      cursor: grab;
+    }
+    #canvas:active { cursor: grabbing; }
+
+    /* === UI PANEL === */
+    #ui {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      width: 272px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px) saturate(120%);
+      -webkit-backdrop-filter: blur(10px) saturate(120%);
+      border: 1px solid var(--border);
+      padding: 16px 16px 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 10px;
+      line-height: 1.2;
+      user-select: none;
+      z-index: 10;
+    }
+
+    #ui .title {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-weight: 600;
+      font-size: 10px;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    #ui .title .muted { font-weight: 400; color: var(--muted); }
+
+    #ui .group {
+      margin-bottom: 14px;
+    }
+
+    #ui .group-label {
+      font-size: 9px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #ui .group-label::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 1px;
+      background: var(--muted);
+    }
+
+    #ui .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    #ui .row label {
+      flex: 0 0 52px;
+      font-size: 10px;
+    }
+    #ui .row .value {
+      flex: 0 0 32px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 10px;
+    }
+
+    /* sliders */
+    #ui input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 1px;
+      background: #000;
+      outline: none;
+      margin: 0;
+      padding: 0;
+    }
+    #ui input[type="range"]::-webkit-slider-runnable-track {
+      height: 1px;
+      background: #000;
+    }
+    #ui input[type="range"]::-moz-range-track {
+      height: 1px;
+      background: #000;
+    }
+    #ui input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 10px;
+      height: 10px;
+      background: #000;
+      cursor: pointer;
+      border: none;
+      margin-top: -4.5px;
+      border-radius: 0;
+    }
+    #ui input[type="range"]::-moz-range-thumb {
+      width: 10px;
+      height: 10px;
+      background: #000;
+      cursor: pointer;
+      border: none;
+      border-radius: 0;
+    }
+
+    /* buttons */
+    #ui button {
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 7px 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--fg);
+      cursor: pointer;
+      transition: background 0.12s linear, color 0.12s linear;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #ui button:hover {
+      background: #000;
+      color: #fff;
+    }
+    #ui button.active {
+      background: #000;
+      color: #fff;
+    }
+
+    #ui .btn-row {
+      display: flex;
+      gap: 4px;
+    }
+    #ui .btn-row button { flex: 1; }
+
+    #ui .full-btn {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      padding: 9px;
+    }
+
+    #ui .full-btn.primary {
+      background: #000;
+      color: #fff;
+    }
+    #ui .full-btn.primary:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    #ui .hint {
+      font-size: 8px;
+      color: var(--muted);
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+
+    /* hide UI in export render would be nice, but for screenshot-style export
+       the UI doesn't appear in the canvas anyway (it's an HTML overlay). */
+  </style>
+</head>
+<body class="bg-light">
+  <div id="ui">
+    <div class="title">
+      <span>Card · 3D</span>
+      <span class="muted">IBM × SW</span>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Card</div>
+      <div class="row">
+        <label>Spacing</label>
+        <input type="range" id="ctl-spacing" min="0" max="2" step="0.01" value="0.4">
+        <span class="value" id="val-spacing">0.40</span>
+      </div>
+      <div class="row">
+        <label>Scale</label>
+        <input type="range" id="ctl-scale" min="0.4" max="2" step="0.01" value="1">
+        <span class="value" id="val-scale">1.00</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Camera</div>
+      <div class="row">
+        <label>FOV</label>
+        <input type="range" id="ctl-fov" min="15" max="70" step="1" value="35">
+        <span class="value" id="val-fov">35</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Rotation</div>
+      <div class="btn-row">
+        <button data-preset="front">Front</button>
+        <button data-preset="iso" class="active">Iso</button>
+        <button data-preset="side">Side</button>
+        <button data-preset="top">Top</button>
+      </div>
+      <button id="ctl-auto" class="full-btn">Auto-Rotate · Off</button>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Scene</div>
+      <div class="btn-row">
+        <button data-bg="light" class="active">Light</button>
+        <button data-bg="dark">Dark</button>
+        <button data-bg="transparent">Trans</button>
+      </div>
+    </div>
+
+    <button class="full-btn" id="ctl-reset">Reset</button>
+    <button class="full-btn primary" id="ctl-export">Export PNG · 2×</button>
+
+    <div class="hint">Drag · Rotate &nbsp;·&nbsp; Wheel · Zoom</div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import * as THREE from 'https://esm.sh/three@0.162.0';
+
+    // ============================================================
+    // SVG SOURCES — inlined verbatim from layer 1–4 .svg files
+    // ============================================================
+    const SVG_1 = `<svg width="986" height="986" viewBox="0 0 986 986" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="492.886" cy="559.124" r="276.808" fill="#D9D9D9"/>
+</svg>`;
+
+    const SVG_4 = `<svg width="986" height="986" viewBox="0 0 986 986" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="985.772" height="985.772" rx="52" fill="#1100FF"/>
+</svg>`;
+
+    const SVG_2 = `<svg width="986" height="986" viewBox="0 0 986 986" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M103.203 914.598C101.579 914.598 100.177 914.288 98.997 913.669C97.8366 913.031 96.8504 912.161 96.0382 911.059L97.8366 909.55C98.5522 910.498 99.345 911.223 100.215 911.726C101.086 912.209 102.11 912.451 103.29 912.451C104.74 912.451 105.843 912.103 106.597 911.407C107.371 910.711 107.757 909.782 107.757 908.622C107.757 907.984 107.632 907.442 107.38 906.998C107.129 906.553 106.723 906.185 106.162 905.895C105.62 905.586 104.905 905.334 104.015 905.141L102.362 904.764C101.144 904.474 100.109 904.097 99.258 903.633C98.4071 903.169 97.7593 902.569 97.3145 901.834C96.8697 901.099 96.6473 900.219 96.6473 899.194C96.6473 897.995 96.9277 896.99 97.4885 896.178C98.0494 895.346 98.8326 894.718 99.8382 894.292C100.863 893.867 102.033 893.654 103.348 893.654C104.876 893.654 106.181 893.934 107.264 894.495C108.366 895.056 109.295 895.878 110.049 896.961L108.221 898.295C107.68 897.522 107.003 896.913 106.191 896.468C105.398 896.023 104.412 895.801 103.232 895.801C101.936 895.801 100.911 896.081 100.157 896.642C99.4224 897.203 99.055 898.024 99.055 899.107C99.055 899.746 99.1903 900.277 99.4611 900.703C99.7512 901.128 100.177 901.486 100.737 901.776C101.298 902.047 102.004 902.279 102.855 902.472L104.508 902.849C105.823 903.14 106.897 903.536 107.728 904.039C108.56 904.542 109.169 905.16 109.556 905.895C109.962 906.63 110.165 907.5 110.165 908.506C110.165 909.744 109.885 910.817 109.324 911.726C108.763 912.635 107.96 913.341 106.916 913.843C105.891 914.346 104.653 914.598 103.203 914.598ZM117.854 914.25V894.002H121.102L124.932 901.167L126.904 904.909H127.049L129.051 901.167L132.88 894.002H136.013V914.25H133.634V900.587V897.193H133.489L131.777 900.587L126.933 909.405L122.089 900.587L120.377 897.193H120.232V900.587V914.25H117.854ZM160.104 914.25H157.552L155.521 908.274H147.341L145.31 914.25H142.845L149.922 894.002H153.026L160.104 914.25ZM154.912 906.127L152.359 898.788L151.489 896.265H151.344L150.474 898.788L147.921 906.127H154.912ZM177.991 914.25H166.939V894.002H169.376V912.103H177.991V914.25ZM196.004 914.25H184.952V894.002H187.389V912.103H196.004V914.25ZM224.354 914.25H213.302V894.002H215.738V912.103H224.354V914.25ZM238.48 914.25H230.358V912.219H233.2V896.033H230.358V894.002H238.48V896.033H235.637V912.219H238.48V914.25ZM259.469 896.149H253.029V914.25H250.592V896.149H244.153V894.002H259.469V896.149ZM280.23 896.149H273.79V914.25H271.353V896.149H264.914V894.002H280.23V896.149ZM298.106 914.25H287.054V894.002H289.491V912.103H298.106V914.25ZM317.425 914.25H305.067V894.002H317.425V896.149H307.504V902.936H316.845V905.083H307.504V912.103H317.425V914.25ZM348.154 914.25H335.796V894.002H348.154V896.149H338.233V902.936H347.574V905.083H338.233V912.103H348.154V914.25ZM367.241 914.25H356.189V894.002H358.626V912.103H367.241V914.25ZM386.56 914.25H374.202V894.002H386.56V896.149H376.639V902.936H385.979V905.083H376.639V912.103H386.56V914.25ZM394.595 914.25V894.002H397.844L401.673 901.167L403.645 904.909H403.791L405.792 901.167L409.621 894.002H412.754V914.25H410.375V900.587V897.193H410.23L408.519 900.587L403.674 909.405L398.83 900.587L397.119 897.193H396.974V900.587V914.25H394.595ZM433.974 914.25H421.617V894.002H433.974V896.149H424.053V902.936H433.394V905.083H424.053V912.103H433.974V914.25ZM454.309 914.25L446.912 901.892L444.475 897.396H444.388V901.892V914.25H442.009V894.002H444.823L452.22 906.359L454.657 910.856H454.744V906.359V894.002H457.122V914.25H454.309ZM479.256 896.149H472.816V914.25H470.38V896.149H463.94V894.002H479.256V896.149Z" fill="white"/>
+</svg>`;
+
+    const SVG_3 = `<svg width="986" height="986" viewBox="0 0 986 986" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M144.565 192.186C135.956 192.186 128.57 190.23 122.407 186.317C116.244 182.306 111.499 176.436 108.173 168.708C104.945 160.882 103.331 151.246 103.331 139.8C103.331 128.354 104.945 118.669 108.173 110.745C111.499 102.724 116.244 96.6584 122.407 92.5497C128.57 88.3431 135.956 86.2399 144.565 86.2399C153.076 86.2399 160.266 88.1964 166.135 92.1095C172.005 96.0225 176.554 101.55 179.782 108.691L169.804 114.707C167.75 109.425 164.619 105.218 160.413 102.088C156.206 98.8595 150.923 97.2454 144.565 97.2454C135.76 97.2454 128.864 100.474 123.874 106.93C118.983 113.289 116.537 121.702 116.537 132.169V147.43C116.537 157.898 118.983 166.164 123.874 172.23C128.864 178.197 135.76 181.181 144.565 181.181C151.119 181.181 156.597 179.518 161 176.192C165.402 172.768 168.63 168.268 170.684 162.691L180.516 168.855C177.288 175.996 172.592 181.67 166.429 185.876C160.364 190.083 153.076 192.186 144.565 192.186ZM227.046 192.186C220.296 192.186 214.329 190.572 209.144 187.344C204.057 184.018 200.046 179.42 197.111 173.55C194.274 167.583 192.856 160.588 192.856 152.566C192.856 144.545 194.274 137.599 197.111 131.729C200.046 125.762 204.057 121.164 209.144 117.936C214.329 114.61 220.296 112.947 227.046 112.947C233.796 112.947 239.715 114.61 244.802 117.936C249.987 121.164 253.998 125.762 256.835 131.729C259.769 137.599 261.237 144.545 261.237 152.566C261.237 160.588 259.769 167.583 256.835 173.55C253.998 179.42 249.987 184.018 244.802 187.344C239.715 190.572 233.796 192.186 227.046 192.186ZM227.046 181.768C233.405 181.768 238.59 179.811 242.601 175.898C246.612 171.985 248.617 166.018 248.617 157.996V147.137C248.617 139.115 246.612 133.148 242.601 129.235C238.59 125.322 233.405 123.365 227.046 123.365C220.785 123.365 215.601 125.322 211.492 129.235C207.481 133.148 205.476 139.115 205.476 147.137V157.996C205.476 166.018 207.481 171.985 211.492 175.898C215.601 179.811 220.785 181.768 227.046 181.768ZM309.158 192.186C302.408 192.186 296.44 190.572 291.255 187.344C286.168 184.018 282.158 179.42 279.223 173.55C276.386 167.583 274.967 160.588 274.967 152.566C274.967 144.545 276.386 137.599 279.223 131.729C282.158 125.762 286.168 121.164 291.255 117.936C296.44 114.61 302.408 112.947 309.158 112.947C315.908 112.947 321.826 114.61 326.913 117.936C332.098 121.164 336.109 125.762 338.946 131.729C341.881 137.599 343.348 144.545 343.348 152.566C343.348 160.588 341.881 167.583 338.946 173.55C336.109 179.42 332.098 184.018 326.913 187.344C321.826 190.572 315.908 192.186 309.158 192.186ZM309.158 181.768C315.516 181.768 320.701 179.811 324.712 175.898C328.723 171.985 330.729 166.018 330.729 157.996V147.137C330.729 139.115 328.723 133.148 324.712 129.235C320.701 125.322 315.516 123.365 309.158 123.365C302.897 123.365 297.712 125.322 293.603 129.235C289.592 133.148 287.587 139.115 287.587 147.137V157.996C287.587 166.018 289.592 171.985 293.603 175.898C297.712 179.811 302.897 181.768 309.158 181.768ZM385.546 190.425H375.128C371.117 190.425 368.035 189.3 365.883 187.05C363.731 184.702 362.655 181.768 362.655 178.246V81.8377H374.394V180.153H385.546V190.425ZM172.592 324.425V278.055H120.793V324.425H108.467V222.001H120.793V267.197H172.592V222.001H184.918V324.425H172.592ZM239.51 326.186C232.662 326.186 226.695 324.572 221.608 321.344C216.521 318.018 212.559 313.42 209.722 307.55C206.885 301.583 205.466 294.588 205.466 286.566C205.466 278.545 206.885 271.599 209.722 265.729C212.559 259.762 216.521 255.164 221.608 251.936C226.695 248.61 232.662 246.947 239.51 246.947C246.26 246.947 252.081 248.561 256.972 251.789C261.864 254.919 265.63 259.273 268.271 264.849C270.912 270.425 272.233 276.784 272.233 283.925V289.501H217.793V293.023C217.793 299.577 219.749 305.056 223.662 309.458C227.673 313.762 233.2 315.914 240.244 315.914C245.037 315.914 249.195 314.789 252.717 312.539C256.336 310.289 259.124 307.061 261.081 302.855L269.445 308.871C266.999 313.958 263.184 318.115 257.999 321.344C252.815 324.572 246.651 326.186 239.51 326.186ZM239.51 256.778C235.304 256.778 231.537 257.756 228.211 259.713C224.983 261.669 222.439 264.409 220.581 267.93C218.722 271.354 217.793 275.267 217.793 279.67V280.697H259.613V279.083C259.613 274.583 258.782 270.67 257.119 267.343C255.456 264.017 253.108 261.425 250.075 259.566C247.043 257.707 243.521 256.778 239.51 256.778ZM353.208 324.425H346.605C343.475 324.425 340.931 323.789 338.975 322.518C337.018 321.148 335.6 319.289 334.719 316.942C333.839 314.594 333.399 311.903 333.399 308.871V307.844L337.947 312.099H332.812C331.246 316.697 328.507 320.219 324.594 322.664C320.779 325.012 316.23 326.186 310.947 326.186C302.925 326.186 296.665 324.132 292.165 320.023C287.762 315.914 285.561 310.338 285.561 303.295C285.561 298.501 286.735 294.49 289.083 291.262C291.431 287.936 294.953 285.441 299.648 283.778C304.442 282.017 310.507 281.137 317.844 281.137H332.812V273.653C332.812 268.273 331.344 264.164 328.409 261.327C325.475 258.49 320.975 257.072 314.909 257.072C310.409 257.072 306.594 258.099 303.464 260.153C300.333 262.208 297.741 264.947 295.686 268.371L288.643 261.767C290.697 257.756 293.974 254.284 298.474 251.349C302.974 248.414 308.648 246.947 315.496 246.947C324.594 246.947 331.687 249.197 336.774 253.697C341.958 258.197 344.551 264.458 344.551 272.479V314.153H353.208V324.425ZM332.812 289.941H317.257C310.605 289.941 305.714 290.92 302.583 292.876C299.453 294.833 297.887 297.67 297.887 301.387V304.469C297.887 308.186 299.257 311.072 301.996 313.126C304.735 315.181 308.355 316.208 312.855 316.208C316.768 316.208 320.192 315.621 323.127 314.447C326.159 313.175 328.507 311.512 330.17 309.458C331.931 307.306 332.812 304.958 332.812 302.414V289.941ZM418.387 324.425V312.099H417.8C415.55 316.795 412.567 320.317 408.849 322.664C405.23 325.012 400.827 326.186 395.643 326.186C389.382 326.186 383.903 324.572 379.208 321.344C374.61 318.115 371.039 313.518 368.496 307.55C366.05 301.583 364.827 294.588 364.827 286.566C364.827 278.447 366.05 271.452 368.496 265.583C371.039 259.615 374.61 255.017 379.208 251.789C383.903 248.561 389.382 246.947 395.643 246.947C400.827 246.947 405.327 248.12 409.143 250.468C412.958 252.718 415.844 256.24 417.8 261.034H418.387V215.838H430.127V324.425H418.387ZM398.871 315.621C402.491 315.621 405.768 315.034 408.703 313.86C411.637 312.588 413.985 310.827 415.746 308.577C417.507 306.23 418.387 303.441 418.387 300.213V272.039C418.387 269.202 417.507 266.708 415.746 264.555C413.985 262.403 411.637 260.691 408.703 259.419C405.768 258.148 402.491 257.512 398.871 257.512C392.317 257.512 387.083 259.615 383.17 263.822C379.355 267.93 377.447 273.36 377.447 280.11V293.023C377.447 299.773 379.355 305.251 383.17 309.458C387.083 313.567 392.317 315.621 398.871 315.621ZM477.975 324.425H467.557C463.546 324.425 460.464 323.3 458.312 321.05C456.16 318.702 455.084 315.768 455.084 312.246V215.838H466.823V314.153H477.975V324.425ZM500.934 230.952C498.489 230.952 496.679 230.365 495.505 229.191C494.331 227.919 493.744 226.305 493.744 224.349V222.441C493.744 220.484 494.331 218.919 495.505 217.745C496.679 216.474 498.489 215.838 500.934 215.838C503.478 215.838 505.288 216.474 506.364 217.745C507.538 218.919 508.125 220.484 508.125 222.441V224.349C508.125 226.305 507.538 227.919 506.364 229.191C505.288 230.365 503.478 230.952 500.934 230.952ZM495.065 324.425V248.707H506.804V324.425H495.065ZM543.489 324.425H531.75V248.707H543.489V261.034H544.076C545.935 256.729 548.527 253.305 551.853 250.762C555.277 248.218 559.826 246.947 565.5 246.947C573.326 246.947 579.489 249.49 583.989 254.577C588.587 259.566 590.886 266.659 590.886 275.854V324.425H579.147V277.909C579.147 271.159 577.679 266.072 574.745 262.648C571.908 259.224 567.652 257.512 561.978 257.512C558.848 257.512 555.864 258.05 553.027 259.126C550.19 260.104 547.891 261.669 546.13 263.822C544.369 265.974 543.489 268.664 543.489 271.892V324.425ZM643.618 326.186C636.771 326.186 630.803 324.572 625.716 321.344C620.629 318.018 616.667 313.42 613.83 307.55C610.993 301.583 609.575 294.588 609.575 286.566C609.575 278.545 610.993 271.599 613.83 265.729C616.667 259.762 620.629 255.164 625.716 251.936C630.803 248.61 636.771 246.947 643.618 246.947C650.368 246.947 656.189 248.561 661.081 251.789C665.972 254.919 669.738 259.273 672.38 264.849C675.021 270.425 676.341 276.784 676.341 283.925V289.501H621.901V293.023C621.901 299.577 623.857 305.056 627.771 309.458C631.781 313.762 637.309 315.914 644.352 315.914C649.146 315.914 653.303 314.789 656.825 312.539C660.445 310.289 663.233 307.061 665.189 302.855L673.553 308.871C671.108 313.958 667.293 318.115 662.108 321.344C656.923 324.572 650.76 326.186 643.618 326.186ZM643.618 256.778C639.412 256.778 635.646 257.756 632.319 259.713C629.091 261.669 626.548 264.409 624.689 267.93C622.83 271.354 621.901 275.267 621.901 279.67V280.697H663.722V279.083C663.722 274.583 662.89 270.67 661.227 267.343C659.564 264.017 657.216 261.425 654.184 259.566C651.151 257.707 647.629 256.778 643.618 256.778Z" fill="white"/>
+</svg>`;
+
+    const SVGS = { 1: SVG_1, 2: SVG_2, 3: SVG_3, 4: SVG_4 };
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    const DEFAULTS = Object.freeze({
+      spacing: 0.4,
+      scale: 1.0,
+      fov: 35,
+      bg: 'light',
+      autoRotate: false,
+      cameraZ: 18,
+    });
+    const state = { ...DEFAULTS };
+
+    const PRESETS = {
+      front: [0, 0, 0],
+      iso:   [-0.28, -0.55, 0],
+      side:  [0, -1.35, 0],
+      top:   [-1.35, 0, 0],
+    };
+
+    // ============================================================
+    // THREE.JS SCENE
+    // ============================================================
+    const canvas = document.getElementById('canvas');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xe5e5e5);
+
+    const camera = new THREE.PerspectiveCamera(
+      state.fov,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 0, state.cameraZ);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: true,
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    // ============================================================
+    // SVG → TEXTURE
+    // ============================================================
+    async function svgToTexture(svgString, size = 2048) {
+      // Force the SVG to rasterize at our target size by rewriting
+      // the outer width/height attributes. viewBox stays intact,
+      // so the drawing scales cleanly.
+      const sized = svgString.replace(
+        /<svg\s+width="\d+"\s+height="\d+"/,
+        `<svg width="${size}" height="${size}"`
+      );
+      const blob = new Blob([sized], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const img = new Image();
+      img.decoding = 'async';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      const cv = document.createElement('canvas');
+      cv.width = size;
+      cv.height = size;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    // ============================================================
+    // CARD CONSTRUCTION
+    // ============================================================
+    const cardGroup = new THREE.Group();
+    // Start at ISO rotation so the 3D effect is visible immediately
+    cardGroup.rotation.set(...PRESETS.iso);
+    scene.add(cardGroup);
+
+    const CARD_SIZE = 10;
+    const geo = new THREE.PlaneGeometry(CARD_SIZE, CARD_SIZE);
+
+    // back → front: layer 4 (blue bg) → layer 3 (headline) → layer 2 (small text) → layer 1 (circle)
+    const ORDER = [4, 3, 2, 1];
+    const layers = [];
+
+    async function buildCard() {
+      for (let i = 0; i < ORDER.length; i++) {
+        const tex = await svgToTexture(SVGS[ORDER[i]]);
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          alphaTest: 0.01,
+          // Blue background (i===0) shows from both sides so it also
+          // serves as the back of the card. The front content layers
+          // (circle, headline, small text) only render from the front.
+          side: i === 0 ? THREE.DoubleSide : THREE.FrontSide,
+          depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.z = i * state.spacing;
+        mesh.renderOrder = i;
+        cardGroup.add(mesh);
+        layers.push({ mesh, stackIndex: i });
+      }
+    }
+
+    // ============================================================
+    // BACK TEXT PLANE
+    // ============================================================
+    // A plane sitting just behind the blue card, facing backward in local
+    // space, with "NOTHING TO SEE HERE :)" rendered into a canvas texture.
+    // Only visible when the card is rotated past 90° (i.e. you're looking
+    // at the back of the card).
+    async function buildBackText() {
+      // Wait for IBM Plex Mono to load before drawing to canvas, otherwise
+      // the browser falls back to a system monospace.
+      try {
+        await document.fonts.load('400 26px "IBM Plex Mono"');
+      } catch (_) { /* best effort */ }
+
+      const size = 2048;
+      const cv = document.createElement('canvas');
+      cv.width = size;
+      cv.height = size;
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+
+      // Font size chosen to visually match the 10–11px UI text when the card
+      // fills most of the viewport. (1 world unit ≈ 204.8 texture px,
+      // card is ~88% of view height → 1 screen px ≈ 2.3 texture px.)
+      ctx.font = '400 26px "IBM Plex Mono", ui-monospace, monospace';
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '2.08px'; // ~0.08em
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fillText('NOTHING TO SEE HERE :)', size / 2, size / 2);
+
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.01,
+        side: THREE.FrontSide,
+        depthWrite: false,
+      });
+
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(CARD_SIZE, CARD_SIZE),
+        mat
+      );
+      // Position just behind the blue card in local space
+      mesh.position.z = -0.01;
+      // Flip 180° around Y so the mesh's front-face points away in the
+      // default orientation. When cardGroup rotates 180° the compound
+      // rotation is identity and this plane ends up facing the camera
+      // with its UVs un-mirrored.
+      mesh.rotation.y = Math.PI;
+      // Draw after the blue card but before the front content layers.
+      // Only matters if both sides happened to be visible simultaneously —
+      // in practice FrontSide culling ensures this plane is only drawn
+      // when the user is looking at the back.
+      mesh.renderOrder = 0.5;
+      cardGroup.add(mesh);
+    }
+
+    // ============================================================
+    // DRAG-TO-ROTATE (card rotates, camera stays fixed)
+    // ============================================================
+    const drag = { active: false, prevX: 0, prevY: 0, vx: 0, vy: 0, pointerId: null };
+    const DAMPING = 0.93;
+    const SENSITIVITY = 0.008;
+    const VELOCITY_EPS = 0.00005;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      drag.active = true;
+      drag.prevX = e.clientX;
+      drag.prevY = e.clientY;
+      drag.vx = 0;
+      drag.vy = 0;
+      drag.pointerId = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      // Cancel any ongoing preset tween if user grabs
+      tween.active = false;
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drag.active) return;
+      const dx = e.clientX - drag.prevX;
+      const dy = e.clientY - drag.prevY;
+      drag.vx = dx * SENSITIVITY;
+      drag.vy = dy * SENSITIVITY;
+      cardGroup.rotation.y += drag.vx;
+      cardGroup.rotation.x += drag.vy;
+      drag.prevX = e.clientX;
+      drag.prevY = e.clientY;
+    });
+
+    const endDrag = (e) => {
+      if (!drag.active) return;
+      drag.active = false;
+      try { canvas.releasePointerCapture(drag.pointerId); } catch (_) {}
+      drag.pointerId = null;
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('pointerleave', endDrag);
+
+    // Wheel → dolly in/out along camera Z
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      state.cameraZ = THREE.MathUtils.clamp(
+        state.cameraZ + e.deltaY * 0.015,
+        6, 50
+      );
+      camera.position.z = state.cameraZ;
+    }, { passive: false });
+
+    // ============================================================
+    // PRESET TWEEN (quaternion slerp)
+    // ============================================================
+    const tween = {
+      active: false,
+      from: new THREE.Quaternion(),
+      to: new THREE.Quaternion(),
+      t: 0,
+      duration: 0.65,
+    };
+    const tmpEuler = new THREE.Euler();
+
+    function setPreset(name) {
+      const euler = PRESETS[name];
+      if (!euler) return;
+      tmpEuler.set(euler[0], euler[1], euler[2], 'XYZ');
+      tween.from.copy(cardGroup.quaternion);
+      tween.to.setFromEuler(tmpEuler);
+      tween.t = 0;
+      tween.active = true;
+      drag.vx = 0;
+      drag.vy = 0;
+      // UI active state
+      document.querySelectorAll('[data-preset]').forEach(b =>
+        b.classList.toggle('active', b.dataset.preset === name)
+      );
+    }
+
+    // ============================================================
+    // APPLY STATE TO SCENE
+    // ============================================================
+    function applyCardState() {
+      layers.forEach((l, i) => { l.mesh.position.z = i * state.spacing; });
+      cardGroup.scale.setScalar(state.scale);
+      camera.fov = state.fov;
+      camera.updateProjectionMatrix();
+    }
+
+    function applyBgState() {
+      document.body.className = `bg-${state.bg}`;
+      if (state.bg === 'light') scene.background = new THREE.Color(0xe5e5e5);
+      else if (state.bg === 'dark') scene.background = new THREE.Color(0x111111);
+      else scene.background = null; // transparent
+      document.querySelectorAll('[data-bg]').forEach(b =>
+        b.classList.toggle('active', b.dataset.bg === state.bg)
+      );
+    }
+
+    function syncUI() {
+      document.getElementById('ctl-spacing').value = state.spacing;
+      document.getElementById('val-spacing').textContent = state.spacing.toFixed(2);
+      document.getElementById('ctl-scale').value = state.scale;
+      document.getElementById('val-scale').textContent = state.scale.toFixed(2);
+      document.getElementById('ctl-fov').value = state.fov;
+      document.getElementById('val-fov').textContent = state.fov;
+      const autoBtn = document.getElementById('ctl-auto');
+      autoBtn.textContent = `Auto-Rotate · ${state.autoRotate ? 'On' : 'Off'}`;
+      autoBtn.classList.toggle('active', state.autoRotate);
+    }
+
+    function reset() {
+      Object.assign(state, DEFAULTS);
+      camera.position.z = state.cameraZ;
+      drag.vx = 0;
+      drag.vy = 0;
+      tween.active = false;
+      cardGroup.rotation.set(...PRESETS.iso);
+      cardGroup.quaternion.setFromEuler(
+        tmpEuler.set(...PRESETS.iso, 'XYZ')
+      );
+      applyCardState();
+      applyBgState();
+      syncUI();
+      document.querySelectorAll('[data-preset]').forEach(b =>
+        b.classList.toggle('active', b.dataset.preset === 'iso')
+      );
+    }
+
+    // ============================================================
+    // RENDER LOOP
+    // ============================================================
+    let lastT = performance.now();
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+
+      if (tween.active) {
+        tween.t += dt / tween.duration;
+        const k = Math.min(1, tween.t);
+        // smoothstep easing
+        const eased = k * k * (3 - 2 * k);
+        cardGroup.quaternion.copy(tween.from).slerp(tween.to, eased);
+        if (k >= 1) tween.active = false;
+      } else if (!drag.active) {
+        // Inertia decay
+        if (Math.abs(drag.vx) > VELOCITY_EPS || Math.abs(drag.vy) > VELOCITY_EPS) {
+          cardGroup.rotation.y += drag.vx;
+          cardGroup.rotation.x += drag.vy;
+          drag.vx *= DAMPING;
+          drag.vy *= DAMPING;
+        } else {
+          drag.vx = 0;
+          drag.vy = 0;
+        }
+        // Auto-rotate (only when idle)
+        if (state.autoRotate) {
+          cardGroup.rotation.y += 0.004;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // ============================================================
+    // EXPORT
+    // ============================================================
+    function exportPNG(scaleFactor = 2) {
+      const prevW = window.innerWidth;
+      const prevH = window.innerHeight;
+      const prevDPR = renderer.getPixelRatio();
+
+      const w = Math.floor(prevW * scaleFactor);
+      const h = Math.floor(prevH * scaleFactor);
+
+      renderer.setPixelRatio(1);
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+
+      const dataUrl = renderer.domElement.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.download = `card-3d-${Date.now()}.png`;
+      a.href = dataUrl;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      // Restore
+      renderer.setPixelRatio(prevDPR);
+      renderer.setSize(prevW, prevH, false);
+      camera.aspect = prevW / prevH;
+      camera.updateProjectionMatrix();
+    }
+
+    // ============================================================
+    // UI WIRING
+    // ============================================================
+    document.getElementById('ctl-spacing').addEventListener('input', (e) => {
+      state.spacing = parseFloat(e.target.value);
+      document.getElementById('val-spacing').textContent = state.spacing.toFixed(2);
+      layers.forEach((l, i) => { l.mesh.position.z = i * state.spacing; });
+    });
+
+    document.getElementById('ctl-scale').addEventListener('input', (e) => {
+      state.scale = parseFloat(e.target.value);
+      document.getElementById('val-scale').textContent = state.scale.toFixed(2);
+      cardGroup.scale.setScalar(state.scale);
+    });
+
+    document.getElementById('ctl-fov').addEventListener('input', (e) => {
+      state.fov = parseFloat(e.target.value);
+      document.getElementById('val-fov').textContent = state.fov;
+      camera.fov = state.fov;
+      camera.updateProjectionMatrix();
+    });
+
+    document.querySelectorAll('[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => setPreset(btn.dataset.preset));
+    });
+
+    document.querySelectorAll('[data-bg]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.bg = btn.dataset.bg;
+        applyBgState();
+      });
+    });
+
+    document.getElementById('ctl-auto').addEventListener('click', () => {
+      state.autoRotate = !state.autoRotate;
+      syncUI();
+    });
+
+    document.getElementById('ctl-reset').addEventListener('click', reset);
+    document.getElementById('ctl-export').addEventListener('click', () => exportPNG(2));
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      switch (e.key.toLowerCase()) {
+        case 'r': reset(); break;
+        case 'e': exportPNG(2); break;
+        case '1': setPreset('front'); break;
+        case '2': setPreset('iso'); break;
+        case '3': setPreset('side'); break;
+        case '4': setPreset('top'); break;
+        case ' ':
+          state.autoRotate = !state.autoRotate;
+          syncUI();
+          e.preventDefault();
+          break;
+      }
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    // ============================================================
+    // KICK OFF
+    // ============================================================
+    Promise.all([buildCard(), buildBackText()]).then(() => {
+      applyCardState();
+      applyBgState();
+      syncUI();
+      requestAnimationFrame(animate);
+    }).catch((err) => {
+      console.error('Failed to build card:', err);
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        `<div style="position:fixed;inset:0;display:grid;place-items:center;font-family:monospace;background:#fee">
+          <div>FAILED TO LOAD SVG TEXTURES<br>${err.message || err}</div>
+        </div>`
+      );
+    });
+  </script>
+</body>
+</html>
