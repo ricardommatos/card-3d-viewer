@@ -217,6 +217,32 @@
       text-align: center;
     }
 
+    /* layer drop slots */
+    #ui .layer-slot {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border: 1px dashed rgba(0, 0, 0, 0.2);
+      margin-bottom: 4px;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    #ui .layer-slot:last-child { margin-bottom: 0; }
+    #ui .layer-slot:hover { border-color: #000; }
+    #ui .layer-slot.drag-over {
+      border-color: var(--accent);
+      background: rgba(17, 0, 255, 0.06);
+    }
+    #ui .layer-slot .layer-label { flex: 1; font-size: 10px; }
+    #ui .layer-slot .layer-thumb {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      flex-shrink: 0;
+    }
+    #ui .layer-slot input[type="file"] { display: none; }
+
     /* hide UI in export render would be nice, but for screenshot-style export
        the UI doesn't appear in the canvas anyway (it's an HTML overlay). */
   </style>
@@ -225,6 +251,30 @@
   <div id="ui">
     <div class="title">
       <span>Card · 3D</span>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Layers</div>
+      <div class="layer-slot" data-layer-index="0">
+        <span class="layer-label">L4 · Back</span>
+        <canvas class="layer-thumb" width="28" height="28"></canvas>
+        <input type="file" accept="image/*">
+      </div>
+      <div class="layer-slot" data-layer-index="1">
+        <span class="layer-label">L3</span>
+        <canvas class="layer-thumb" width="28" height="28"></canvas>
+        <input type="file" accept="image/*">
+      </div>
+      <div class="layer-slot" data-layer-index="2">
+        <span class="layer-label">L2</span>
+        <canvas class="layer-thumb" width="28" height="28"></canvas>
+        <input type="file" accept="image/*">
+      </div>
+      <div class="layer-slot" data-layer-index="3">
+        <span class="layer-label">L1 · Front</span>
+        <canvas class="layer-thumb" width="28" height="28"></canvas>
+        <input type="file" accept="image/*">
+      </div>
     </div>
 
     <div class="group">
@@ -385,6 +435,40 @@
     }
 
     // ============================================================
+    // FILE → TEXTURE (supports SVG, PNG, JPG, WebP)
+    // ============================================================
+    async function fileToTexture(file, size = 2048) {
+      // SVG files get the viewBox resize trick for crisp rendering
+      if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
+        const text = await file.text();
+        return svgToTexture(text, size);
+      }
+      // Raster images: blob URL → Image → canvas
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      const cv = document.createElement('canvas');
+      cv.width = size;
+      cv.height = size;
+      const ctx = cv.getContext('2d');
+      // Center-cover: draw the image centered, covering the square
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      URL.revokeObjectURL(url);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    // ============================================================
     // CARD CONSTRUCTION
     // ============================================================
     const cardGroup = new THREE.Group();
@@ -398,17 +482,16 @@
     // back → front: layer 4 (blue bg) → layer 3 (headline) → layer 2 (small text) → layer 1 (circle)
     const ORDER = [4, 3, 2, 1];
     const layers = [];
+    const originalTextures = [];
 
     async function buildCard() {
       for (let i = 0; i < ORDER.length; i++) {
         const tex = await svgToTexture(SVGS[ORDER[i]]);
+        originalTextures.push(tex);
         const mat = new THREE.MeshBasicMaterial({
           map: tex,
           transparent: true,
           alphaTest: 0.01,
-          // Blue background (i===0) shows from both sides so it also
-          // serves as the back of the card. The front content layers
-          // (circle, headline, small text) only render from the front.
           side: i === 0 ? THREE.DoubleSide : THREE.FrontSide,
           depthWrite: false,
         });
@@ -418,6 +501,48 @@
         cardGroup.add(mesh);
         layers.push({ mesh, stackIndex: i });
       }
+    }
+
+    // ============================================================
+    // LAYER REPLACEMENT (drag-and-drop / click-to-browse)
+    // ============================================================
+    function updateThumb(index, sourceCanvas) {
+      const thumbs = document.querySelectorAll('.layer-slot .layer-thumb');
+      const thumb = thumbs[index];
+      if (!thumb) return;
+      const ctx = thumb.getContext('2d');
+      ctx.clearRect(0, 0, 28, 28);
+      ctx.drawImage(sourceCanvas, 0, 0, 28, 28);
+    }
+
+    function initThumbs() {
+      layers.forEach((l, i) => {
+        const srcCanvas = l.mesh.material.map.source.data;
+        if (srcCanvas) updateThumb(i, srcCanvas);
+      });
+    }
+
+    async function replaceLayer(index, file) {
+      const tex = await fileToTexture(file);
+      const layer = layers[index];
+      // Don't dispose original textures — they're needed for reset
+      if (layer.mesh.material.map !== originalTextures[index]) {
+        layer.mesh.material.map.dispose();
+      }
+      layer.mesh.material.map = tex;
+      layer.mesh.material.needsUpdate = true;
+      updateThumb(index, tex.source.data);
+    }
+
+    function resetLayers() {
+      layers.forEach((l, i) => {
+        if (l.mesh.material.map !== originalTextures[i]) {
+          l.mesh.material.map.dispose();
+          l.mesh.material.map = originalTextures[i];
+          l.mesh.material.needsUpdate = true;
+        }
+        updateThumb(i, originalTextures[i].source.data);
+      });
     }
 
     // ============================================================
@@ -607,6 +732,7 @@
       );
       applyCardState();
       applyBgState();
+      resetLayers();
       syncUI();
       document.querySelectorAll('[data-preset]').forEach(b =>
         b.classList.toggle('active', b.dataset.preset === 'iso')
@@ -722,6 +848,38 @@
     document.getElementById('ctl-reset').addEventListener('click', reset);
     document.getElementById('ctl-export').addEventListener('click', () => exportPNG(2));
 
+    // Layer slot drop + click handlers
+    document.querySelectorAll('.layer-slot').forEach((slot) => {
+      const idx = parseInt(slot.dataset.layerIndex);
+      const fileInput = slot.querySelector('input[type="file"]');
+
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          await replaceLayer(idx, file);
+        }
+      });
+
+      // Click → open file picker as fallback
+      slot.addEventListener('click', (e) => {
+        if (e.target === fileInput) return;
+        fileInput.click();
+      });
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
+        if (file) await replaceLayer(idx, file);
+        fileInput.value = ''; // allow re-selecting same file
+      });
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT') return;
@@ -754,6 +912,7 @@
       applyCardState();
       applyBgState();
       syncUI();
+      initThumbs();
       requestAnimationFrame(animate);
     }).catch((err) => {
       console.error('Failed to build card:', err);
