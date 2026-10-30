@@ -115,10 +115,11 @@ def gloss_black_material(name, srgb):
     return mat
 
 
-def resin_material(name, srgb, thickness):
+def resin_material(name, srgb, thickness, glow=0.0):
     """Cast resin block: clear surface, colour absorbed inside the volume, so
     thin edges glow pale and the thick core goes deep. Density is scaled to
-    the block's thickness so every block lands near its ink head-on."""
+    the block's thickness so every block lands near its ink head-on.
+    glow > 0 makes the volume emit its own colour, like edge-lit acrylic."""
     c = tuple(x ** 0.5 for x in srgb_to_linear(srgb)) + (1.0,)
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -135,7 +136,14 @@ def resin_material(name, srgb, thickness):
     links.new(glass.outputs["BSDF"], mix.inputs[1])
     links.new(shadow.outputs["BSDF"], mix.inputs[2])
     links.new(mix.outputs["Shader"], out.inputs["Surface"])
-    links.new(vol.outputs["Volume"], out.inputs["Volume"])
+    if glow:
+        emit = _node(nodes, "ShaderNodeEmission", (350, -450), Color=c, Strength=glow / thickness)
+        add = _node(nodes, "ShaderNodeAddShader", (500, -300))
+        links.new(vol.outputs["Volume"], add.inputs[0])
+        links.new(emit.outputs["Emission"], add.inputs[1])
+        links.new(add.outputs["Shader"], out.inputs["Volume"])
+    else:
+        links.new(vol.outputs["Volume"], out.inputs["Volume"])
     return mat
 
 

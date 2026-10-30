@@ -52,6 +52,7 @@ def setup(variant=None):
         "three_quarter": (ap.camera("cam_three_quarter", C, (-2.4, -3.3, 1.4), (0.12, -0.25, 1.18), lens=52,
                                     dof=((-0.1, -0.35, 1.3), 5.6)), studio_rig),
         "side": (ap.camera("cam_side", C, (2.6, -2.2, 0.95), (-0.08, -0.3, 1.25), lens=40), studio_rig),
+        "low": (ap.camera("cam_low", C, (1.5, -2.5, 0.28), (-0.12, -0.3, 1.4), lens=30), studio_rig),
         "detail": (ap.camera("cam_detail", C, (-1.05, -2.5, 1.95), (-0.06, -0.45, 1.36), lens=90,
                              dof=((-0.06, -0.47, 1.36), 2.8)), studio_rig),
     }
@@ -131,7 +132,7 @@ def reveal(scene, rigs, size, samples, exposure, tag="", hold_in=14, move=84, ho
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     ap_ = argparse.ArgumentParser()
-    ap_.add_argument("--shots", default="front,three_quarter,side,detail")
+    ap_.add_argument("--shots", default="front,three_quarter,side,detail,low")
     ap_.add_argument("--scale", type=float, default=1.0)
     ap_.add_argument("--samples", type=int, default=256)
     ap_.add_argument("--no-render", action="store_true")

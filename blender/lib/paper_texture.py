@@ -40,7 +40,8 @@ def make(poster, path, scale=2, seed=7):
 
     ink = _ink(poster.INKS[poster.LOGO["ink"]]) + (255,)
     logo = poster.LOGO
-    logo_font = find_font("Inter-Black.otf", "InterDisplay-Black.otf", "Arial Black.ttf", "DejaVuSans-Bold.ttf")
+    logo_font = find_font(*logo.get("fonts", ("Inter-Black.otf", "InterDisplay-Black.otf", "Arial Black.ttf",
+                                               "DejaVuSans-Bold.ttf")))
     if logo_font:
         # set the wordmark, then stretch it to the poster's wide proportions
         f = ImageFont.truetype(logo_font, logo["size"] * scale)
@@ -51,10 +52,10 @@ def make(poster, path, scale=2, seed=7):
         img.paste(Image.new("RGB", mark.size, ink[:3]),
                   (logo["x"] * scale, logo["baseline"] * scale + t), mark)
 
-    body = poster.BODY
+    body = getattr(poster, "BODY", None) or {"lines": []}
     body_font = find_font("c0583bt_.pfb", "CourierPrime-Bold.ttf", "Courier New Bold.ttf",
                           "LiberationMono-Bold.ttf", "DejaVuSansMono-Bold.ttf")
-    if body_font:
+    if body_font and body["lines"]:
         f = ImageFont.truetype(body_font, round(body["size"] * scale))
         for i, line in enumerate(body["lines"]):
             y = (body["first_baseline"] + i * body["leading"]) * scale
