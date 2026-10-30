@@ -5,3 +5,7 @@
 example.jpg
 example 2.jpg
 videoframe_*.png
+
+# Blender build output (regenerate with blender/*/build.py)
+blender/*/build/
+__pycache__/
