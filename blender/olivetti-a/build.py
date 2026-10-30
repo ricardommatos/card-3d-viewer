@@ -4,6 +4,7 @@
     python build.py                       # build .blend + render every shot
     python build.py --shots front --scale 0.3 --samples 32   # quick look
     python build.py --reveal --shots none # flat poster -> sculpture animation
+    python build.py --variant mixed       # mixed finishes: resin, lacquer, card...
     blender --background --python build.py -- --no-render   # .blend only
 """
 
@@ -27,9 +28,9 @@ import poster  # noqa: E402
 FULL = (1577, 2000)
 
 
-def setup():
+def setup(variant=None):
     tex = paper_texture.make(poster, os.path.join(HERE, "build", "paper.png"))
-    scene, cols = ap.build(poster, tex)
+    scene, cols = ap.build(poster, tex, variant=variant)
     c = ap.poster_center(poster)
     L, C = cols["Lights"], cols["Cameras"]
 
@@ -63,7 +64,7 @@ def smooth(a, b, t):
     return t * t * (3 - 2 * t)
 
 
-def reveal(scene, rigs, size, samples, hold_in=14, move=84, hold_out=22):
+def reveal(scene, rigs, size, samples, exposure, tag="", hold_in=14, move=84, hold_out=22):
     """Dolly-zoom out of the flat poster into the sculpture.
 
     Starts on a 400 mm lens from far away (perspective flattened, the slabs
@@ -98,6 +99,8 @@ def reveal(scene, rigs, size, samples, hold_in=14, move=84, hold_out=22):
             ap.set_tint(m, 1 / 3 + (0.8 - 1 / 3) * light)
             for node, sock in (("glass", "Base Color"), ("shadow", "Color")):
                 m.node_tree.nodes[node].inputs[sock].keyframe_insert("default_value", frame=f + 1)
+        scene.view_settings.exposure = exposure * light
+        scene.view_settings.keyframe_insert("exposure", frame=f + 1)
         cam.keyframe_insert("location", frame=f + 1)
         cam.keyframe_insert("rotation_euler", frame=f + 1)
         data.keyframe_insert("lens", frame=f + 1)
@@ -108,15 +111,15 @@ def reveal(scene, rigs, size, samples, hold_in=14, move=84, hold_out=22):
     scene.render.fps = 24
     scene.render.resolution_x, scene.render.resolution_y = size
     scene.cycles.samples = samples
-    scene.view_settings.view_transform = "AgX"
-    scene.view_settings.look = "AgX - Punchy"
+    scene.view_settings.view_transform = "Standard"
+    scene.view_settings.look = "None"
     scene.render.image_settings.file_format = "PNG"
-    out = os.path.join(HERE, "build", "reveal")
+    out = os.path.join(HERE, "build", "reveal" + tag)
     scene.render.filepath = os.path.join(out, "f_####")
     bpy.ops.render.render(animation=True)
     # forward then backward, so the loop breathes in and out
     seq = os.path.join(out, "f_%04d.png")
-    mp4 = os.path.join(HERE, "build", "renders", "reveal.mp4")
+    mp4 = os.path.join(HERE, "build", "renders", f"reveal{tag}.mp4")
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-i", seq, "-filter_complex",
                     "[0]split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", mp4], check=True)
@@ -133,25 +136,28 @@ def main():
     ap_.add_argument("--samples", type=int, default=256)
     ap_.add_argument("--no-render", action="store_true")
     ap_.add_argument("--reveal", action="store_true", help="also render the reveal animation")
+    ap_.add_argument("--exposure", type=float, default=-0.7, help="stops, studio shots only")
+    ap_.add_argument("--variant", help="named take from poster.VARIANTS, e.g. mixed")
     args = ap_.parse_args(argv)
 
-    scene, shots, rigs = setup()
+    scene, shots, rigs = setup(args.variant)
+    tag = f"-{args.variant}" if args.variant else ""
     lights = rigs[0] + rigs[1]
     os.makedirs(os.path.join(HERE, "build"), exist_ok=True)
     bpy.ops.file.pack_all()
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "build", "olivetti-a.blend"), compress=True)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "build", f"olivetti-a{tag}.blend"), compress=True)
     if args.no_render:
         return
     size = (round(FULL[0] * args.scale), round(FULL[1] * args.scale))
     for name in filter(None, args.shots.replace("none", "").split(",")):
         cam, rig = shots[name]
-        ap.render(scene, cam, os.path.join(HERE, "build", "renders", f"{name}.png"),
+        ap.render(scene, cam, os.path.join(HERE, "build", "renders", f"{name}{tag}.png"),
                   size, args.samples, rig, lights,
-                  *(("Standard", 1 / 3) if name == "front" else ("AgX", 0.8)))
+                  *(("Standard", 1 / 3) if name == "front" else ("Standard", 0.8, args.exposure)))
     if args.reveal:
         reveal(scene, rigs, (round(720 * args.scale) // 2 * 2, round(912 * args.scale) // 2 * 2),
-               args.samples)
-        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "build", "olivetti-a.blend"), compress=True)
+               args.samples, args.exposure, tag)
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "build", f"olivetti-a{tag}.blend"), compress=True)
 
 
 if __name__ == "__main__":

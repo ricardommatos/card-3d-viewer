@@ -97,6 +97,7 @@ def acrylic_material(name, srgb, frost=0.015, strength=0.42):
 
 
 def set_tint(mat, strength):
+    strength = max(strength, mat.get("min_tint", 0.0))
     tint = tuple(c ** strength for c in srgb_to_linear(mat["ink_srgb"])) + (1.0,)
     mat.node_tree.nodes["glass"].inputs["Base Color"].default_value = tint
     mat.node_tree.nodes["shadow"].inputs["Color"].default_value = tint
@@ -111,6 +112,58 @@ def gloss_black_material(name, srgb):
     # "print" light, so it reads as solid ink head-on and reflects the
     # coloured slabs from an angle
     p.inputs["Roughness"].default_value = 0.02
+    return mat
+
+
+def resin_material(name, srgb, thickness):
+    """Cast resin block: clear surface, colour absorbed inside the volume, so
+    thin edges glow pale and the thick core goes deep. Density is scaled to
+    the block's thickness so every block lands near its ink head-on."""
+    c = tuple(x ** 0.5 for x in srgb_to_linear(srgb)) + (1.0,)
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nodes, links = mat.node_tree.nodes, mat.node_tree.links
+    nodes.clear()
+    out = _node(nodes, "ShaderNodeOutputMaterial", (600, 0))
+    glass = _node(nodes, "ShaderNodeBsdfPrincipled", (0, 120), **{
+        "Base Color": (1, 1, 1, 1), "Roughness": 0.01, "IOR": 1.54, "Transmission Weight": 1.0})
+    shadow = _node(nodes, "ShaderNodeBsdfTransparent", (0, -260))
+    path = _node(nodes, "ShaderNodeLightPath", (-300, 300))
+    mix = _node(nodes, "ShaderNodeMixShader", (350, 0))
+    vol = _node(nodes, "ShaderNodeVolumeAbsorption", (350, -250), Color=c, Density=1.6 / thickness)
+    links.new(path.outputs["Is Shadow Ray"], mix.inputs["Fac"])
+    links.new(glass.outputs["BSDF"], mix.inputs[1])
+    links.new(shadow.outputs["BSDF"], mix.inputs[2])
+    links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    links.new(vol.outputs["Volume"], out.inputs["Volume"])
+    return mat
+
+
+def frosted_materials(name, srgb):
+    """Satin-back acrylic: polished face towards the viewer (no glare under
+    the print light), frosted face towards the paper, which softens what
+    shows through. Returns (polished, frosted)."""
+    pair = []
+    for suffix, frost in (("", 0.015), ("_back", 0.3)):
+        mat = acrylic_material(name + suffix, srgb, frost=frost)
+        mat["min_tint"] = 0.75  # scattering slabs need more pigment
+        set_tint(mat, 0.75)
+        pair.append(mat)
+    return tuple(pair)
+
+
+def lacquer_material(name, srgb):
+    """Opaque painted block under a mirror clear coat. The base layer has no
+    specular of its own, so the near-axis print light can't wash it out."""
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    p = mat.node_tree.nodes["Principled BSDF"]
+    # a touch deeper than the ink: opaque paint reads lighter than overprint
+    p.inputs["Base Color"].default_value = tuple(c ** 1.3 for c in srgb_to_linear(srgb)) + (1.0,)
+    p.inputs["Roughness"].default_value = 0.4
+    p.inputs["Specular IOR Level"].default_value = 0.0
+    p.inputs["Coat Weight"].default_value = 1.0
+    p.inputs["Coat Roughness"].default_value = 0.02
     return mat
 
 
@@ -133,13 +186,39 @@ def paper_material(name, texture_path, srgb):
     return mat
 
 
-def matte_material(name, srgb, roughness=0.7):
+def matte_material(name, srgb, roughness=0.7, specular=0.5):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     p = mat.node_tree.nodes["Principled BSDF"]
     p.inputs["Base Color"].default_value = srgb_to_linear(srgb) + (1.0,)
     p.inputs["Roughness"].default_value = roughness
+    p.inputs["Specular IOR Level"].default_value = specular
     return mat
+
+
+FINISHES = ("clear", "frosted", "resin", "lacquer", "card")
+
+
+def finish_material(poster, spec, cache):
+    """Material(s) for a shape's ink + finish (default: clear acrylic, black
+    inks as mirror lacquer): one material, or (front, back-face) for frosted.
+    Resin is per shape, since it depends on depth."""
+    ink = spec["ink"]
+    finish = spec.get("finish", "gloss" if ink in ("black", "brown") else "clear")
+    srgb = poster.INKS[ink]
+    if finish == "resin":
+        return resin_material(f"resin_{ink}_{len(cache)}", srgb, spec["depth"])
+    key = (ink, finish)
+    if key not in cache:
+        name = f"{finish}_{ink}"
+        cache[key] = {
+            "clear": lambda: acrylic_material(name, srgb),
+            "frosted": lambda: frosted_materials(name, srgb),
+            "lacquer": lambda: lacquer_material(name, srgb),
+            "card": lambda: matte_material(name, srgb, 0.85, 0.15),
+            "gloss": lambda: gloss_black_material(name, srgb),
+        }[finish]()
+    return cache[key]
 
 
 # ---------------------------------------------------------------- geometry
@@ -164,11 +243,15 @@ def slab(poster, name, spec, material, collection):
     for poly in mesh.polygons:
         poly.use_smooth = True
     mesh.set_sharp_from_angle(angle=math.radians(35))
-    mesh.materials.append(material)
+    for m in material if isinstance(material, tuple) else (material,):
+        mesh.materials.append(m)
+    if len(mesh.materials) > 1:  # second material goes on the face towards the paper
+        for poly in mesh.polygons:
+            poly.material_index = 1 if poly.normal.y > 0.99 else 0
     obj = bpy.data.objects.new(name, mesh)
     collection.objects.link(obj)
     bev = obj.modifiers.new("edge", "BEVEL")
-    bev.width = 0.0025
+    bev.width = spec.get("bevel", 0.0025)
     bev.segments = 3
     bev.limit_method = "ANGLE"
     bev.angle_limit = math.radians(35)
@@ -231,22 +314,20 @@ def cyclorama(material, collection, radius=2.5, size=30):
 # ---------------------------------------------------------------- build
 
 
-def build(poster, texture_path=None, backdrop=(0.16, 0.155, 0.15)):
+def build(poster, texture_path=None, backdrop=(0.16, 0.155, 0.15), variant=None):
+    """variant: name of an entry in poster.VARIANTS, whose per-shape overrides
+    (finish, z, depth, bevel...) are laid over SHAPES."""
+    overrides = getattr(poster, "VARIANTS", {}).get(variant, {}) if variant else {}
+    shapes = {n: {**s, **overrides.get(n, {})} for n, s in poster.SHAPES.items()}
     scene = reset_scene()
     root = scene.collection
     cols = {n: bpy.data.collections.new(n) for n in ("Poster", "Studio", "Lights", "Cameras")}
     for c in cols.values():
         root.children.link(c)
 
-    inks = {}
-    for key, rgb in poster.INKS.items():
-        if key in ("black", "brown"):
-            inks[key] = gloss_black_material(f"ink_{key}", rgb)
-        else:
-            inks[key] = acrylic_material(f"acrylic_{key}", rgb)
-
-    for name, spec in poster.SHAPES.items():
-        slab(poster, name, spec, inks[spec["ink"]], cols["Poster"])
+    cache = {}
+    for name, spec in shapes.items():
+        slab(poster, name, spec, finish_material(poster, spec, cache), cols["Poster"])
 
     paper_board(poster, paper_material("paper", texture_path, poster.PAPER),
                 matte_material("board_edge", poster.PAPER, 0.9), cols["Poster"])
@@ -329,7 +410,7 @@ def look_at(obj, target):
     obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
 
 
-def render(scene, cam, path, size, samples, lights_on, all_lights, view="Standard", tint=1 / 3):
+def render(scene, cam, path, size, samples, lights_on, all_lights, view="Standard", tint=1 / 3, exposure=0.0):
     """view: "Standard" keeps flat inks exact; "AgX" rolls off studio highlights.
     tint: acrylic colour strength (see acrylic_material)."""
     scene.camera = cam
@@ -338,6 +419,7 @@ def render(scene, cam, path, size, samples, lights_on, all_lights, view="Standar
             set_tint(mat, tint)
     scene.view_settings.view_transform = view
     scene.view_settings.look = "AgX - Punchy" if view == "AgX" else "None"
+    scene.view_settings.exposure = exposure
     for light in all_lights:
         light.hide_render = light not in lights_on
         light.hide_viewport = light not in lights_on

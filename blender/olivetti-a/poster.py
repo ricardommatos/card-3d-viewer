@@ -104,3 +104,24 @@ BODY = dict(
         "calculer, administrer.",
     ],
 )
+
+# Alternative takes: per-shape overrides laid over SHAPES (build.py --variant).
+# finish: clear | frosted | resin | lacquer | card   (see acrylic_poster.FINISHES)
+VARIANTS = {
+    # mixed media: the black becomes deep matte blocks, the Z a chunky
+    # lacquered extrusion, the counter a thick cast-resin wedge, and the
+    # green base grows straight out of the paper as solid card
+    "mixed": {
+        "black_corner": dict(finish="card", depth=0.07, bevel=0.004),
+        "black_left": dict(finish="card", depth=0.07, bevel=0.004),
+        "black_right": dict(finish="card", depth=0.07, bevel=0.004),
+        "red_z": dict(finish="lacquer", z=0.10, depth=0.10, bevel=0.012),
+        "red_foot_left": dict(finish="lacquer", z=0.10, depth=0.06, bevel=0.010),
+        "red_foot_right": dict(finish="frosted"),
+        "green_top": dict(finish="frosted"),
+        "yellow_counter": dict(finish="resin", z=0.34, depth=0.18, bevel=0.008),
+        "green_bar": dict(finish="resin", z=0.50, depth=0.10, bevel=0.010),
+        "green_stem": dict(finish="card", z=0.0, depth=0.30, bevel=0.006),
+        "yellow_next": dict(finish="card", z=0.0, depth=0.14, bevel=0.006),
+    },
+}
