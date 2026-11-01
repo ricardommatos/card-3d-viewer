@@ -9,3 +9,5 @@ videoframe_*.png
 # Blender build output (regenerate with blender/*/build.py)
 blender/*/build/
 __pycache__/
+blender/_queue/
+blender/*/READY

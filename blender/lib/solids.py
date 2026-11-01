@@ -90,3 +90,54 @@ def blade(poster, name, cx, cy, angle, r0_px, r1_px, width_px, depth, material, 
     pts = [(cx + ca * r - sa * s * hw, cy + sa * r + ca * s * hw)
            for r, s in ((r0_px, -1), (r1_px, -1), (r1_px, 1), (r0_px, 1))]
     return prism(poster, name, pts, depth, material, collection, base, bevel=0.0015)
+
+
+def relief(poster, name, items, material, collection, bevel=0.0015):
+    """One mesh of traced regions, each rising from the paper to its own height.
+    items: [(outer_px, [holes_px], height_m)]; holes come out as real holes."""
+    from mathutils.geometry import delaunay_2d_cdt
+
+    bm = bmesh.new()
+    for outer, holes, height in items:
+        loops = [outer] + holes
+        # caps: constrained Delaunay copes with holes that touch the outline,
+        # where scanline fill gives up
+        pts, faces = [], []
+        for loop in loops:
+            faces.append(list(range(len(pts), len(pts) + len(loop))))
+            pts += [Vector(p) for p in loop]
+        cap_v, _, cap_f, _, _, _ = delaunay_2d_cdt(pts, [], faces, 3, 1e-5)
+        for depth, flip in ((height, False), (0.0, True)):
+            vs = [bm.verts.new(w(poster, p.x, p.y, depth)) for p in cap_v]
+            for f in cap_f:
+                try:
+                    bm.faces.new([vs[i] for i in (reversed(f) if flip else f)])
+                except ValueError:
+                    pass
+        for loop in loops:
+            top = [bm.verts.new(w(poster, x, y, height)) for x, y in loop]
+            bot = [bm.verts.new(w(poster, x, y, 0.0)) for x, y in loop]
+            n = len(loop)
+            for i in range(n):
+                try:
+                    bm.faces.new((top[i], top[(i + 1) % n], bot[(i + 1) % n], bot[i]))
+                except ValueError:
+                    pass
+    # walls and caps were built apart; weld them where they meet
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-6)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    for p in mesh.polygons:
+        p.use_smooth = True
+    mesh.set_sharp_from_angle(angle=math.radians(35))
+    mesh.materials.append(material)
+    obj = bpy.data.objects.new(name, mesh)
+    collection.objects.link(obj)
+    if bevel:
+        mod = obj.modifiers.new("soft", "BEVEL")
+        mod.width, mod.segments = bevel, 2
+        mod.limit_method = "ANGLE"
+        mod.harden_normals = True
+    return obj
