@@ -230,7 +230,7 @@ def main():
         top = name == "top"
         ap.render(scene, shots[name], os.path.join(HERE, "build", "renders", f"{name}.png"),
                   size, args.samples, top_rig if top else studio_rig, top_rig + studio_rig,
-                  "Standard", 1 / 3, 0.45 if top else args.exposure)  # top: paper reads white
+                  "Standard", 1 / 3, 0.0 if top else args.exposure)
 
 
 if __name__ == "__main__":

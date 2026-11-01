@@ -308,6 +308,8 @@ def cyclorama(material, collection, radius=2.5, size=30):
     for i in range(len(prof) - 1):
         bm.faces.new((rows[0][i], rows[1][i], rows[1][i + 1], rows[0][i + 1]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    if bm.faces[0].normal.z < 0:  # an open sheet can come out facing away from the studio
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     mesh = bpy.data.meshes.new("cyclorama")
     bm.to_mesh(mesh)
     bm.free()
@@ -315,6 +317,7 @@ def cyclorama(material, collection, radius=2.5, size=30):
         p.use_smooth = True
     mesh.materials.append(material)
     obj = bpy.data.objects.new("cyclorama", mesh)
+    obj.visible_shadow = False  # the tall sweep must never shade the set from a low sun
     collection.objects.link(obj)
     return obj
 
